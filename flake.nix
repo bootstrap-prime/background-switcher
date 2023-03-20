@@ -46,6 +46,31 @@
         };
 
         packages.default = craneLib.buildPackage { src = ./.; };
+        packages.rofi-switcher = let
+          switcher = pkgs.writeScriptBin "background-switcher.sh" ''
+            #!/usr/bin/env bash
+            if [[ x"$@" = x"quit" ]]
+            then
+                exit 0
+            fi
+
+            if [[ ! $# -eq 0 ]]
+            then
+                echo "$@" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
+
+                # $@ = "quit"
+                exit 0
+            fi
+
+            echo "quit"
+            echo "query" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
+
+          '';
+        in pkgs.writeScriptBin "rofi-background" ''
+          ${pkgs.rofi}/bin/rofi -show background -modes "background:${
+            switcher
+          }/bin/background-switcher.sh"
+        '';
 
         checks = let
           craneLib =
@@ -102,7 +127,7 @@
               };
               Socket = {
                 Accept = "yes";
-                ListenStream = "9999";                # ListenStream = "/tmp/background-switcher.socket";
+                ListenStream = "/tmp/background-switcher.socket";                # ListenStream = "/tmp/background-switcher.socket";
               };
               Install = {
                 WantedBy = ["sockets.target"];

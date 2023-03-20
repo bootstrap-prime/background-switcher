@@ -7,6 +7,8 @@ use std::{
     io::stdin,
     path::PathBuf,
     process::{Child, Command},
+    thread,
+    time::Duration,
 };
 
 use anyhow::bail;
@@ -20,55 +22,62 @@ struct Config {
 }
 
 fn main() -> anyhow::Result<()> {
-    let mut command_handle = select_random()?;
+    // let mut command_handle = select_random()?;
 
-    loop {
-        let mut choice = String::new();
-        stdin().read_line(&mut choice)?;
+    // loop {
+    let mut choice = String::new();
+    stdin().read_line(&mut choice)?;
 
-        let config = get_categories()?;
+    let config = get_categories()?;
 
-        match choice.trim() {
-            "query" => {
-                config
-                    .categories
-                    .iter()
-                    .inspect(|(e, _)| println!("{}", e))
-                    .fold(0, |e, _| e);
-            }
-            "random" => {
-                command_handle = select_random()?;
-            }
-            _ => {
-                if let Some((_, loc)) = &config
-                    .categories
-                    .iter()
-                    .find(|(name, _)| name == choice.trim())
-                {
-                    command_handle
-                        .kill()
-                        .expect("failed to kill previous background.");
+    match choice.trim() {
+        "query" => {
+            config
+                .categories
+                .iter()
+                .inspect(|(e, _)| println!("{}", e))
+                .fold(0, |e, _| e);
 
-                    let mut command = Command::new("feh");
-                    command.arg(config.feh_arg.as_str());
-
-                    for path in loc {
-                        command.arg("--randomize").arg(path.to_str().unwrap());
-                    }
-
-                    command.spawn()?;
-                    // command_handle = Command::new("feh")
-                    //     .arg("--randomize")
-                    //     .arg(path)
-                    //     .arg(&config.feh_arg.as_str())
-                    //     .spawn()
-                    //     .unwrap();
-                } else {
-                    eprintln!("unsupported choice selected. ignoring.");
-                }
-            }
+            println!("random");
         }
+        "random" => {
+            // command_handle.kill()?;
+            // command_handle =
+            select_random()?;
+        }
+        _ => {
+            if let Some((_, loc)) = &config
+                .categories
+                .iter()
+                .find(|(name, _)| name == choice.trim())
+            {
+                // command_handle
+                //     .kill()
+                //     .expect("failed to kill previous background.");
+
+                let mut command = Command::new("feh");
+                command.arg(config.feh_arg.as_str());
+
+                for path in loc {
+                    command.arg("--randomize").arg(path.to_str().unwrap());
+                }
+
+                // command_handle = c
+                command.spawn()?;
+                // command_handle = Command::new("feh")
+                //     .arg("--randomize")
+                //     .arg(path)
+                //     .arg(&config.feh_arg.as_str())
+                //     .spawn()
+                //     .unwrap();
+            } else {
+                eprintln!("unsupported choice selected. ignoring.");
+            }
+        } // }
     }
+
+    thread::sleep(Duration::from_millis(100));
+    Ok(())
 }
 
 fn select_random() -> anyhow::Result<Child> {
