@@ -41,9 +41,9 @@
           RUST_BACKTRACE = 1;
         };
 
-        packages.default = craneLib.buildPackage { src = ./.; };
-        packages.rofi-switcher = pkgs.writeScriptBin "rofi-background" ''
-          ${pkgs.rofi}/bin/rofi -show background -modes "background:${self.packages.${system}.default}/bin/background-switcher"
+        packages.switcher = craneLib.buildPackage { src = ./.; };
+        packages.default = pkgs.writeScriptBin "rofi-background" ''
+          ${pkgs.rofi}/bin/rofi -show background -modes "background:${self.packages.${system}.switcher}/bin/background-switcher"
         '';
 
         checks = let

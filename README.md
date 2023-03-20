@@ -6,7 +6,7 @@ This rust background switcher deals allows a user to display random images from 
 
 define sets of backgrounds, as lists of separate folders. example config included.
 
-Run as a systemd user service, with systemd mapping stdio to a socket. use the provided rofi script to switch between categories.
+Run the default package from a keybind.
 
 ## License
 This readme based on [makeareadme](https://www.makeareadme.com/) 
