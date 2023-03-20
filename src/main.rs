@@ -9,6 +9,7 @@ use std::{
     process::{Child, Command},
 };
 
+use anyhow::bail;
 use directories::ProjectDirs;
 use rand::{seq::SliceRandom, thread_rng};
 
@@ -102,12 +103,15 @@ fn get_categories() -> anyhow::Result<Config> {
 
     let categories = config.categories.clone();
 
-    let categories = categories
+    let categories: Vec<(String, Vec<PathBuf>)> = categories
         .into_iter()
         .map(|(name, paths)| {
             let paths: Vec<PathBuf> = paths
                 .iter()
-                .map(|e| fs::canonicalize(nu_path::expand_tilde(e)).unwrap())
+                .map(|e| {
+                    fs::canonicalize(nu_path::expand_tilde(e))
+                        .expect(&format!("file does not exist: {}", e.to_string_lossy()))
+                })
                 .collect();
 
             (name, paths)
@@ -115,20 +119,6 @@ fn get_categories() -> anyhow::Result<Config> {
         .collect();
 
     config.categories = categories;
-
-    // let normalized_paths: Vec<(String, Vec<PathBuf>)> = config.categories.iter().map(|(name, paths)| {
-    //     let newpaths = paths.into_iter()
-    //         .map(|e| fs::canonicalize(nu_path::expand_tilde(e)))
-    //         .collect::<Result<Vec<_>, _>>()?
-    //         .into_iter()
-    //         .collect::<Vec<PathBuf>>();
-
-    //     Ok((name.to_owned(), newpaths))
-    // }).collect::<Result<Vec<_>, _>>()?
-    //     .into_iter()
-    //     .collect();
-
-    // config.categories = normalized_paths;
 
     Ok(config)
 }
