@@ -68,14 +68,17 @@ fn main() -> anyhow::Result<()> {
         }
     }
 
-    // rust is too blazing fast. sleep before quitting to let feh have time to run.
-    thread::sleep(Duration::from_millis(100));
-
     if let Some(mut handle) = command_handle {
+        // rust is too blazing fast. sleep before quitting to let feh have time to run.
+        thread::sleep(Duration::from_millis(100));
+
         handle.kill()?;
     }
     Ok(())
 }
+
+// rofi supports custom error messages, but I should just be good and not make mistakes.
+// I don't want to implement that right now.
 
 fn select_random() -> anyhow::Result<Child> {
     let config = get_categories()?;
