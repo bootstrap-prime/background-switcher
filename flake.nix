@@ -1,7 +1,6 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs";
-    nixpkgs-21.url = "github:NixOS/nixpkgs/nixos-21.11";
     rust-overlay.url = "github:oxalica/rust-overlay";
     flake-utils.url = "github:numtide/flake-utils";
 
@@ -15,7 +14,7 @@
     };
   };
 
-  outputs = inputs@{ self, flake-utils, nixpkgs, rust-overlay, nixpkgs-21, crane
+  outputs = inputs@{ self, flake-utils, nixpkgs, rust-overlay, crane
     , advisory-db, ... }:
     flake-utils.lib.eachSystem [ flake-utils.lib.system.x86_64-linux ] (system:
       let
@@ -23,19 +22,17 @@
         pkgs = import nixpkgs { inherit system overlays; };
 
         rust-custom-toolchain = (pkgs.rust-bin.stable.latest.default.override {
-              extensions = [
-                "rust-src"
-                "rustfmt"
-                "llvm-tools-preview"
-                "rust-analyzer-preview"
-              ];
+          extensions = [
+            "rust-src"
+            "rustfmt"
+            "rust-analyzer-preview"
+          ];
         });
 
+        craneLib =
+          (inputs.crane.mkLib pkgs).overrideToolchain rust-custom-toolchain;
       in rec {
         devShell = pkgs.mkShell {
-          buildInputs = with pkgs; [
-          ];
-
           nativeBuildInputs = with pkgs; [
             # get current rust toolchain defaults (this includes clippy and rustfmt)
             rust-custom-toolchain
@@ -48,26 +45,20 @@
           RUST_BACKTRACE = 1;
         };
 
-        default = {};
+        packages.default = craneLib.buildPackage { src = ./.; };
 
         checks = let
           craneLib =
             (inputs.crane.mkLib pkgs).overrideToolchain rust-custom-toolchain;
           src = ./.;
 
-          cargoArtifacts = craneLib.buildDepsOnly {
-            inherit src;
-            buildInputs = with pkgs; [ openssl pkg-config ];
-          };
-          build-tests = craneLib.buildPackage {
-            inherit cargoArtifacts src;
-            buildInputs = with pkgs; [ openssl pkg-config capnproto ];
-          };
+          cargoArtifacts = craneLib.buildDepsOnly { inherit src; };
+          build-tests = craneLib.buildPackage { inherit cargoArtifacts src; };
         in {
           inherit build-tests;
 
           # Run clippy (and deny all warnings) on the crate source,
-          # again, resuing the dependency artifacts from above.
+          # again, reusing the dependency artifacts from above.
           #
           # Note that this is done as a separate derivation so that
           # we can block the CI if there are issues here, but not
@@ -75,8 +66,6 @@
           my-crate-clippy = craneLib.cargoClippy {
             inherit cargoArtifacts src;
             cargoClippyExtraArgs = "-- --deny warnings";
-
-            buildInputs = with pkgs; [ openssl pkg-config capnproto ];
           };
 
           # Check formatting
@@ -94,10 +83,54 @@
             inherit cargoArtifacts src;
             partitions = 1;
             partitionType = "count";
-
-            buildInputs = with pkgs; [ openssl pkg-config capnproto ];
           };
         };
 
+        nixosModules."background-switcher" = { config, lib, ... }: let
+          cfg = config.services.background-switcher;
+        in {
+          options = {
+            services.background-switcher = {
+              enable = lib.mkEnableOption "a userspace background controller service.";
+            };
+          };
+
+          config = lib.mkIf cfg.enable {
+            systemd.user.sockets."background-switcher" = {
+              Unit = {
+                PartOf = "background-switcher.service";
+              };
+              Socket = {
+                Accept = "yes";
+                ListenStream = "9999";                # ListenStream = "/tmp/background-switcher.socket";
+              };
+              Install = {
+                WantedBy = ["sockets.target"];
+              };
+            };
+
+            systemd.user.services."background-switcher@" = {
+              Unit = {
+                Description = "A userspace background controller service.";
+                Requires = [ "background-switcher.socket" ];
+              };
+
+              # Install = {
+              #   WantedBy = [ "multi-user.target" ];
+              # };
+
+              Service = {
+                Type = "simple";
+                Sockets = "background-switcher.socket";
+
+                ExecStart = ''${pkgs.bash}/bin/bash -c "PATH=${pkgs.feh}/bin/ exec ${self.packages.${system}.default}/bin/background-switcher"'';
+                StandardInput = "socket";
+                StandardOutput = "socket";
+                StandardError = "journal";
+                Environment = "PATH=${pkgs.feh}/bin/feh";
+              };
+            };
+          };
+        };
       });
 }

@@ -95,7 +95,8 @@ fn get_categories() -> anyhow::Result<Config> {
 
     if !config_path.exists() {
         anyhow::bail!(
-            "Config file does not exist. An example config file can be found in the repo."
+            "Config file {} does not exist. An example config file can be found in the repo.",
+            config_path.to_string_lossy()
         );
     }
 
