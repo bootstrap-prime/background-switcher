@@ -1,0 +1,5 @@
+categories = [
+  ["space", ["~/Pictures/backgrounds/space"]],
+  ["nature", ["~/Pictures/backgrounds/grand_canyon", "~/Pictures/backgrounds/coral_reef"]]
+]
+feh_arg = "--bg-max"
