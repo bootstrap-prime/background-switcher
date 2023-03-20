@@ -22,11 +22,7 @@
         pkgs = import nixpkgs { inherit system overlays; };
 
         rust-custom-toolchain = (pkgs.rust-bin.stable.latest.default.override {
-          extensions = [
-            "rust-src"
-            "rustfmt"
-            "rust-analyzer-preview"
-          ];
+          extensions = [ "rust-src" "rustfmt" "rust-analyzer-preview" ];
         });
 
         craneLib =
@@ -47,30 +43,31 @@
 
         packages.default = craneLib.buildPackage { src = ./.; };
         packages.rofi-switcher = let
-          switcher = pkgs.writeScriptBin "background-switcher.sh" ''
-            #!/usr/bin/env bash
-            if [[ x"$@" = x"quit" ]]
-            then
-                exit 0
-            fi
+          # switcher = pkgs.writeScriptBin "background-switcher.sh" ''
+          #   #!/usr/bin/env bash
+          #   if [[ x"$@" = x"quit" ]]
+          #   then
+          #       exit 0
+          #   fi
 
-            if [[ ! $# -eq 0 ]]
-            then
-                echo "$@" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
+          #   if [[ ! $# -eq 0 ]]
+          #   then
+          #       echo "$@" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
 
-                # $@ = "quit"
-                exit 0
-            fi
+          #       # $@ = "quit"
+          #       exit 0
+          #   fi
 
-            echo "quit"
-            echo "query" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
+          #   echo "quit"
+          #   echo "query" | ${pkgs.socat}/bin/socat - unix-connect:/tmp/background-switcher.socket
 
-          '';
+          # '';
         in pkgs.writeScriptBin "rofi-background" ''
-          ${pkgs.rofi}/bin/rofi -show background -modes "background:${
-            switcher
-          }/bin/background-switcher.sh"
+          ${pkgs.rofi}/bin/rofi -show background -modes "background:${self.packages.${system}.default}/bin/background-switcher"
         '';
+          # ${
+          #   switcher
+          # }/bin/background-switcher.sh"
 
         checks = let
           craneLib =
@@ -111,51 +108,52 @@
           };
         };
 
-        nixosModules."background-switcher" = { config, lib, ... }: let
-          cfg = config.services.background-switcher;
-        in {
-          options = {
-            services.background-switcher = {
-              enable = lib.mkEnableOption "a userspace background controller service.";
+        nixosModules."background-switcher" = { config, lib, ... }:
+          let cfg = config.services.background-switcher;
+          in {
+            options = {
+              services.background-switcher = {
+                enable = lib.mkEnableOption
+                  "a userspace background controller service.";
+              };
+            };
+
+            config = lib.mkIf cfg.enable {
+              systemd.user.sockets."background-switcher" = {
+                Unit = { PartOf = "background-switcher.service"; };
+                Socket = {
+                  Accept = "yes";
+                  ListenStream =
+                    "/tmp/background-switcher.socket"; # ListenStream = "/tmp/background-switcher.socket";
+                };
+                Install = { WantedBy = [ "sockets.target" ]; };
+              };
+
+              systemd.user.services."background-switcher@" = {
+                Unit = {
+                  Description = "A userspace background controller service.";
+                  Requires = [ "background-switcher.socket" ];
+                };
+
+                # Install = {
+                #   WantedBy = [ "multi-user.target" ];
+                # };
+
+                Service = {
+                  Type = "simple";
+                  Sockets = "background-switcher.socket";
+
+                  ExecStart = ''
+                    ${pkgs.bash}/bin/bash -c "PATH=${pkgs.feh}/bin/ exec ${
+                      self.packages.${system}.default
+                    }/bin/background-switcher"'';
+                  StandardInput = "socket";
+                  StandardOutput = "socket";
+                  StandardError = "journal";
+                  Environment = "PATH=${pkgs.feh}/bin/feh";
+                };
+              };
             };
           };
-
-          config = lib.mkIf cfg.enable {
-            systemd.user.sockets."background-switcher" = {
-              Unit = {
-                PartOf = "background-switcher.service";
-              };
-              Socket = {
-                Accept = "yes";
-                ListenStream = "/tmp/background-switcher.socket";                # ListenStream = "/tmp/background-switcher.socket";
-              };
-              Install = {
-                WantedBy = ["sockets.target"];
-              };
-            };
-
-            systemd.user.services."background-switcher@" = {
-              Unit = {
-                Description = "A userspace background controller service.";
-                Requires = [ "background-switcher.socket" ];
-              };
-
-              # Install = {
-              #   WantedBy = [ "multi-user.target" ];
-              # };
-
-              Service = {
-                Type = "simple";
-                Sockets = "background-switcher.socket";
-
-                ExecStart = ''${pkgs.bash}/bin/bash -c "PATH=${pkgs.feh}/bin/ exec ${self.packages.${system}.default}/bin/background-switcher"'';
-                StandardInput = "socket";
-                StandardOutput = "socket";
-                StandardError = "journal";
-                Environment = "PATH=${pkgs.feh}/bin/feh";
-              };
-            };
-          };
-        };
       });
 }

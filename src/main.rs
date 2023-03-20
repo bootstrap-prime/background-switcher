@@ -3,7 +3,7 @@
 // parse config file at $XDG_CONFIG_DIR/background/config.toml
 
 use std::{
-    fs,
+    env, fs,
     io::stdin,
     path::PathBuf,
     process::{Child, Command},
@@ -22,13 +22,18 @@ struct Config {
 }
 
 fn main() -> anyhow::Result<()> {
-    // let mut command_handle = select_random()?;
-
-    // loop {
+    let args: Vec<String> = env::args().collect();
     let mut choice = String::new();
-    stdin().read_line(&mut choice)?;
+
+    if args.len() == 2 {
+        choice = dbg!(args[1].clone());
+    } else if args.len() == 1 {
+        choice = "query".to_string();
+    }
 
     let config = get_categories()?;
+
+    let mut command_handle: Option<Child> = None;
 
     match choice.trim() {
         "query" => {
@@ -41,9 +46,7 @@ fn main() -> anyhow::Result<()> {
             println!("random");
         }
         "random" => {
-            // command_handle.kill()?;
-            // command_handle =
-            select_random()?;
+            command_handle = Some(select_random()?);
         }
         _ => {
             if let Some((_, loc)) = &config
@@ -51,10 +54,6 @@ fn main() -> anyhow::Result<()> {
                 .iter()
                 .find(|(name, _)| name == choice.trim())
             {
-                // command_handle
-                //     .kill()
-                //     .expect("failed to kill previous background.");
-
                 let mut command = Command::new("feh");
                 command.arg(config.feh_arg.as_str());
 
@@ -62,21 +61,19 @@ fn main() -> anyhow::Result<()> {
                     command.arg("--randomize").arg(path.to_str().unwrap());
                 }
 
-                // command_handle = c
-                command.spawn()?;
-                // command_handle = Command::new("feh")
-                //     .arg("--randomize")
-                //     .arg(path)
-                //     .arg(&config.feh_arg.as_str())
-                //     .spawn()
-                //     .unwrap();
+                command_handle = Some(command.spawn()?);
             } else {
                 eprintln!("unsupported choice selected. ignoring.");
             }
-        } // }
+        }
     }
 
+    // rust is too blazing fast. sleep before quitting to let feh have time to run.
     thread::sleep(Duration::from_millis(100));
+
+    if let Some(mut handle) = command_handle {
+        handle.kill()?;
+    }
     Ok(())
 }
 
