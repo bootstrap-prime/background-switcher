@@ -70,7 +70,7 @@ fn main() -> anyhow::Result<()> {
 
     if let Some(mut handle) = command_handle {
         // rust is too blazing fast. sleep before quitting to let feh have time to run.
-        thread::sleep(Duration::from_millis(100));
+        thread::sleep(Duration::from_millis(200));
 
         handle.kill()?;
     }
