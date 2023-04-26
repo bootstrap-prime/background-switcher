@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
         // rust is too blazing fast. sleep before quitting to let feh have time to run.
         thread::sleep(Duration::from_millis(200));
 
-        handle.kill()?;
+        handle.wait()?;
     }
     Ok(())
 }
